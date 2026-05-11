@@ -1,0 +1,74 @@
+name: Spec Kit lockdown
+
+on:
+  pull_request:
+    paths:
+      - '.github/prompts/speckit.*.prompt.md'
+      - '.specify/**'
+      - '.vscode/**'
+      - '.github/CODEOWNERS'
+      - '.github/workflows/lock-speckit.yml'
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check approver is a Spec Kit admin
+        uses: actions/github-script@v7
+        env:
+          ADMIN_TEAM_SLUG: speckit-admins
+        with:
+          script: |
+            const adminTeam = process.env.ADMIN_TEAM_SLUG;
+            const { owner, repo } = context.repo;
+            const pr = context.issue.number;
+
+            const reviews = await github.paginate(github.rest.pulls.listReviews, {
+              owner, repo, pull_number: pr, per_page: 100,
+            });
+            const latest = new Map();
+            for (const r of reviews) latest.set(r.user.login, r.state);
+            const approvers = [...latest.entries()]
+              .filter(([, state]) => state === 'APPROVED')
+              .map(([login]) => login);
+
+            if (approvers.length === 0) {
+              core.setFailed(
+                `This PR touches locked Spec Kit files and has no APPROVED review yet. ` +
+                `A member of @${owner}/${adminTeam} must approve.`
+              );
+              return;
+            }
+
+            // Resolve the admin team's members. If the team doesn't exist (e.g. personal repo),
+            // fall back to "any user with admin/maintain permission on the repo".
+            let admins = new Set();
+            try {
+              const members = await github.paginate(github.rest.teams.listMembersInOrg, {
+                org: owner, team_slug: adminTeam, per_page: 100,
+              });
+              admins = new Set(members.map(m => m.login));
+            } catch (e) {
+              core.warning(`Team ${owner}/${adminTeam} not resolvable (${e.status}). ` +
+                `Falling back to repo admin/maintain permission check.`);
+              for (const login of approvers) {
+                const { data: perm } = await github.rest.repos.getCollaboratorPermissionLevel({
+                  owner, repo, username: login,
+                });
+                if (['admin', 'maintain'].includes(perm.permission)) admins.add(login);
+              }
+            }
+
+            const ok = approvers.some(a => admins.has(a));
+            if (!ok) {
+              core.setFailed(
+                `Locked Spec Kit paths changed. None of the current approvers ` +
+                `(${approvers.join(', ')}) are members of @${owner}/${adminTeam}.`
+              );
+            } else {
+              core.info(`Approved by Spec Kit admin: ${approvers.filter(a => admins.has(a)).join(', ')}`);
+            }

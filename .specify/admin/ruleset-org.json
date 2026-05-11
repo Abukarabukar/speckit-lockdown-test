@@ -1,0 +1,37 @@
+{
+  "name": "Spec Kit lockdown (org)",
+  "target": "push",
+  "enforcement": "active",
+  "conditions": {
+    "repository_property": {
+      "include": [
+        {
+          "name": "uses_speckit",
+          "property_values": ["true"]
+        }
+      ]
+    }
+  },
+  "bypass_actors": [
+    {
+      "actor_id": 0,
+      "actor_type": "Team",
+      "bypass_mode": "always",
+      "_comment": "Replace actor_id with the numeric id of your speckit-admins team. Resolve with: gh api /orgs/<ORG>/teams/speckit-admins --jq .id"
+    }
+  ],
+  "rules": [
+    {
+      "type": "file_path_restriction",
+      "parameters": {
+        "restricted_file_paths": [
+          ".github/prompts/speckit.*.prompt.md",
+          ".specify/**",
+          ".vscode/**",
+          ".github/CODEOWNERS",
+          ".github/workflows/lock-speckit.yml"
+        ]
+      }
+    }
+  ]
+}

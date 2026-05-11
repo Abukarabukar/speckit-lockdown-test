@@ -1,0 +1,26 @@
+{
+  "name": "Spec Kit lockdown (repo)",
+  "target": "push",
+  "enforcement": "active",
+  "bypass_actors": [
+    {
+      "actor_id": 5,
+      "actor_type": "RepositoryRole",
+      "bypass_mode": "always"
+    }
+  ],
+  "rules": [
+    {
+      "type": "file_path_restriction",
+      "parameters": {
+        "restricted_file_paths": [
+          ".github/prompts/speckit.*.prompt.md",
+          ".specify/**",
+          ".vscode/**",
+          ".github/CODEOWNERS",
+          ".github/workflows/lock-speckit.yml"
+        ]
+      }
+    }
+  ]
+}

@@ -13,7 +13,21 @@
       "Bash(uv tool *)",
       "Bash(specify version *)",
       "PowerShell(specify version *)",
-      "PowerShell(specify init *)"
+      "PowerShell(specify init *)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebSearch",
+      "WebFetch(domain:docs.github.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:code.visualstudio.com)",
+      "Bash(where gh *)",
+      "Bash(gh --version)",
+      "Bash(gh auth *)",
+      "PowerShell(Get-Command *)",
+      "Bash(winget install *)",
+      "PowerShell(Test-Path *)",
+      "PowerShell(Get-Process *)",
+      "PowerShell(winget install *)",
+      "PowerShell(& 'C:\\\\Program Files\\\\GitHub CLI\\\\gh.exe' auth status 2>&1)"
     ]
   }
 }

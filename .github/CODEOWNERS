@@ -1,0 +1,20 @@
+# Spec Kit lockdown — these paths require approval from the Spec Kit admin owner.
+# This file works with branch/ruleset "Require review from Code Owners" to gate
+# PR merges. Direct pushes are blocked by the push ruleset (see
+# .specify/admin/ruleset-repo.json and ruleset-org.json).
+#
+# Personal test setup: owner is the repo owner's user handle.
+# Production rollout: replace @abukarshegow with @<ORG>/speckit-admins.
+
+# Spec Kit prompt files (Copilot slash commands)
+/.github/prompts/speckit.*.prompt.md   @Abukarabukar
+
+# Spec Kit core (templates, scripts, workflows, integrations, memory)
+/.specify/                              @Abukarabukar
+
+# Editor configuration shipped by Spec Kit
+/.vscode/                               @Abukarabukar
+
+# Lock the lock itself — don't let users disable enforcement
+/.github/CODEOWNERS                     @Abukarabukar
+/.github/workflows/lock-speckit.yml     @Abukarabukar
