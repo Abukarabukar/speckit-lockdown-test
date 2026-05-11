@@ -20,25 +20,26 @@ Copilot still reads the prompt files normally — none of these layers restrict 
 
 ## Personal-account test setup (public repo)
 
-Push rulesets with `file_path_restriction` are available on public repos across all plans, so you can verify the lock works against a personal GitHub.com account before rolling out at the company.
+**Important constraint:** GitHub rejects `push` rulesets on personal-account repos ("only org-owned repos can have push rules"). On a personal account, use a **branch** ruleset for `main` that requires PRs + code-owner review, combined with the `lock-speckit` workflow as a required status check. The org-level **push** ruleset (`ruleset-org.json`) is what you'll apply at the company.
+
+Applied configuration on `Abukarabukar/speckit-lockdown-test` (ruleset id `16246633`):
 
 ```pwsh
 # 1. Authenticate
-gh auth login
+gh auth login --web --git-protocol https --hostname github.com --scopes "repo,workflow,read:org"
 
-# 2. Create a public repo from this directory
-gh repo create <YOUR_USERNAME>/speckit-lockdown-test --public --source . --push
+# 2. Create the public repo and push
+gh repo create Abukarabukar/speckit-lockdown-test --public --source . --remote origin --push
 
-# 3. Apply the repo-level ruleset
-#    (file path: .specify/admin/ruleset-repo.json)
-gh api `
-  -X POST `
-  -H "Accept: application/vnd.github+json" `
-  /repos/<YOUR_USERNAME>/speckit-lockdown-test/rulesets `
-  --input .specify/admin/ruleset-repo.json
+# 3. Apply the branch ruleset (PRs + code-owner review + required `guard` check)
+gh api -X POST -H "Accept: application/vnd.github+json" `
+  /repos/Abukarabukar/speckit-lockdown-test/rulesets `
+  --input .specify/admin/ruleset-repo-branch.json
 ```
 
-The included `ruleset-repo.json` uses bypass actor `RepositoryRole 5` (admin role) so you, as the repo owner, can still push when you need to update prompts. To **prove** the lock works, temporarily remove the bypass list, attempt to edit `.specify/init-options.json`, push, and observe the push being rejected by the server with `GH013: Repository rule violations found`.
+Verification result: opening a PR that edits `.specify/init-options.json` blocks the merge with `mergeStateStatus=BLOCKED`, the `guard` workflow fails with the message *"This PR touches locked Spec Kit files and has no APPROVED review yet. A member of @Abukarabukar/speckit-admins must approve."*, and `reviewDecision=REVIEW_REQUIRED` (CODEOWNERS).
+
+Admin bypass works: pushing directly to `main` as the repo admin succeeds (bypass actor = `RepositoryRole 5`).
 
 To list / disable / update the ruleset:
 
