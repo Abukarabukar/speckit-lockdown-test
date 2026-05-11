@@ -9,15 +9,20 @@
 $ErrorActionPreference = 'SilentlyContinue'
 $problems = New-Object System.Collections.Generic.List[string]
 
-$prompts = 'C:\ProgramData\speckit\prompts'
-if (-not (Test-Path $prompts)) {
-  $problems.Add("Missing path: $prompts")
+$root = 'C:\ProgramData\speckit'
+if (-not (Test-Path $root)) {
+  $problems.Add("Missing path: $root")
 } else {
-  $acl = (icacls $prompts 2>$null) -join "`n"
-  if ($acl -match '\(I\)')                                                              { $problems.Add('Path has inherited ACEs (should be /inheritance:r).') }
-  if ($acl -notmatch 'NT AUTHORITY\\SYSTEM:\([^)]*F[^)]*\)')                            { $problems.Add('SYSTEM is not granted Full Control on the prompts path.') }
+  $acl = (icacls $root 2>$null) -join "`n"
+  if ($acl -match '\(I\)')                                                              { $problems.Add("$root has inherited ACEs (should be /inheritance:r).") }
+  if ($acl -notmatch 'NT AUTHORITY\\SYSTEM:\([^)]*F[^)]*\)')                            { $problems.Add("SYSTEM is not granted Full Control on $root.") }
   if (-not ($acl -match 'BUILTIN\\Users:\([^)]*\b(R|RX)\b[^)]*\)') -or
        ($acl -match 'BUILTIN\\Users:\([^)]*\b(W|M|F)\b[^)]*\)'))                        { $problems.Add('Users entry is missing or has write access.') }
+
+  foreach ($sub in @('prompts','agents')) {
+    $p = Join-Path $root $sub
+    if (-not (Test-Path $p)) { $problems.Add("Missing path: $p") }
+  }
 }
 
 $module = Join-Path $env:ProgramFiles 'WindowsPowerShell\Modules\Internal.SpecKit\Internal.SpecKit.psm1'

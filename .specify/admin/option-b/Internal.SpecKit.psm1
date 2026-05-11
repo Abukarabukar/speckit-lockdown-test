@@ -18,6 +18,7 @@
 #     can call it without re-entry.
 
 $script:SystemPromptsPath = 'C:\ProgramData\speckit\prompts'
+$script:SystemAgentsPath  = 'C:\ProgramData\speckit\agents'
 $script:UpstreamCommand   = 'specify-upstream'
 
 function Test-IsInitInvocation {
@@ -50,29 +51,39 @@ function Set-WorkspacePromptPolicy {
     return
   }
 
-  # 1. Replace the workspace .github/prompts/ with a junction to the system path.
-  # VS Code's Copilot Chat resolves prompt files from .github/prompts/ in the
-  # workspace. Using a junction means the folder appears in the workspace as
-  # expected, but every read/write goes through the system path's ACL — so
-  # tampering is blocked at the OS layer with no Copilot-version dependency.
-  $githubDir        = Join-Path $TargetDir '.github'
-  $workspacePrompts = Join-Path $githubDir 'prompts'
+  # 1. Replace workspace .github/prompts/ and .github/agents/ with junctions to
+  # the system paths. VS Code's Copilot Chat resolves prompts from
+  # .github/prompts/ (slash command surface) and the prompt's `agent:` field
+  # then resolves to .github/agents/<name>.agent.md (behavior). Both need to be
+  # locked or a user can edit the agent definition and change what
+  # /speckit.plan actually does.
+  $githubDir = Join-Path $TargetDir '.github'
   New-Item -ItemType Directory -Force -Path $githubDir | Out-Null
-  if (Test-Path $workspacePrompts) { Remove-Item -Recurse -Force $workspacePrompts }
-  New-Item -ItemType Junction -Path $workspacePrompts -Target $script:SystemPromptsPath | Out-Null
-  Write-Host "Internal.SpecKit: linked $workspacePrompts -> $($script:SystemPromptsPath)"
 
-  # 2. Belt-and-suspenders: refuse to commit anything under .github/prompts/.
-  # The junction itself shouldn't be tracked by git (Add-Content/Remove-Item etc.
-  # against the junction target hit the system-path ACL anyway), but explicitly
-  # excluding it stops a confused user from committing a junction reference.
+  $junctions = @(
+    @{ Workspace = Join-Path $githubDir 'prompts'; System = $script:SystemPromptsPath },
+    @{ Workspace = Join-Path $githubDir 'agents';  System = $script:SystemAgentsPath  }
+  )
+  foreach ($j in $junctions) {
+    if (Test-Path $j.Workspace) { Remove-Item -Recurse -Force $j.Workspace }
+    New-Item -ItemType Junction -Path $j.Workspace -Target $j.System | Out-Null
+    Write-Host "Internal.SpecKit: linked $($j.Workspace) -> $($j.System)"
+  }
+
+  # 2. Belt-and-suspenders: refuse to commit anything under .github/prompts/
+  # or .github/agents/. The junctions themselves wouldn't normally be tracked,
+  # but if a determined user replaces a junction with a real folder, git could
+  # otherwise pick it up.
   $gitignore = Join-Path $TargetDir '.gitignore'
-  $marker    = '# Spec Kit prompts are managed by IT (junction to C:\ProgramData\speckit\prompts)'
-  $line      = '.github/prompts/'
-  $hasLine = (Test-Path $gitignore) -and ((Get-Content $gitignore -ErrorAction SilentlyContinue) -contains $line)
-  if (-not $hasLine) {
-    Add-Content -Path $gitignore -Value "`n$marker`n$line"
-    Write-Host "Internal.SpecKit: appended $line to .gitignore"
+  $marker    = '# Spec Kit prompts/agents are managed by IT (junctions to C:\ProgramData\speckit)'
+  $lines     = @('.github/prompts/', '.github/agents/')
+
+  $current = if (Test-Path $gitignore) { Get-Content $gitignore -ErrorAction SilentlyContinue } else { @() }
+  $toAdd   = $lines | Where-Object { $current -notcontains $_ }
+  if ($toAdd) {
+    $block = @($marker) + $toAdd -join "`n"
+    Add-Content -Path $gitignore -Value "`n$block"
+    Write-Host "Internal.SpecKit: appended $($toAdd -join ', ') to .gitignore"
   }
 }
 

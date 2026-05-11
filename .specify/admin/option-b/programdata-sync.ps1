@@ -7,9 +7,13 @@ $ErrorActionPreference = 'Continue'
 $log = 'C:\ProgramData\speckit\sync.log'
 function Log($m) { "{0:o} {1}" -f (Get-Date), $m | Tee-Object -FilePath $log -Append }
 
-$prompts = 'C:\ProgramData\speckit\prompts'
-if (-not (Test-Path (Join-Path $prompts '.git'))) {
-  Log "No .git in $prompts; run programdata-setup.ps1 first."
+$root     = 'C:\ProgramData\speckit'
+$checkout = Join-Path $root '.speckit-prompts-repo'
+$prompts  = Join-Path $root 'prompts'
+$agents   = Join-Path $root 'agents'
+
+if (-not (Test-Path (Join-Path $checkout '.git'))) {
+  Log "No checkout at $checkout; run programdata-setup.ps1 first."
   exit 0
 }
 
@@ -33,8 +37,22 @@ if ($token) {
   & $git config --system credential.helper "store --file=$store" | Out-Null
 }
 
-Log "Pulling $prompts ..."
-$out  = & $git -C $prompts fetch --quiet --prune 2>&1
-$out += & $git -C $prompts pull --ff-only --quiet 2>&1
-if ($LASTEXITCODE -ne 0) { Log "  WARN: $out" } else { Log '  OK' }
+Log "Pulling $checkout ..."
+$out  = & $git -C $checkout fetch --quiet --prune 2>&1
+$out += & $git -C $checkout pull --ff-only --quiet 2>&1
+if ($LASTEXITCODE -ne 0) { Log "  WARN: $out"; exit 1 }
+Log '  OK'
+
+# Sync canonical files from the checkout into the user-visible prompts/agents
+# folders, preserving the read-only ACL on those folders (SYSTEM keeps F).
+Log "Syncing prompts and agents into user-visible folders ..."
+if (Test-Path (Join-Path $checkout 'prompts')) {
+  Get-ChildItem -Path $prompts -Filter '*.prompt.md' -ErrorAction SilentlyContinue | Remove-Item -Force
+  Copy-Item -Path (Join-Path $checkout 'prompts\*.prompt.md') -Destination $prompts -Force
+}
+if (Test-Path (Join-Path $checkout 'agents')) {
+  Get-ChildItem -Path $agents -Filter '*.agent.md' -ErrorAction SilentlyContinue | Remove-Item -Force
+  Copy-Item -Path (Join-Path $checkout 'agents\*.agent.md') -Destination $agents -Force
+}
+Log '  Sync complete.'
 exit 0

@@ -2,8 +2,9 @@
 
 This package replaces per-repo prompt-file ACLs with a single system-managed prompt path plus a corporate wrapper around `specify`. End-state on every device:
 
-- `C:\ProgramData\speckit\prompts\` holds the canonical Spec Kit prompts. **Users have Read+Execute only**; SYSTEM/Admins have Full Control.
-- Every new repo created with `specify init` has `.github/prompts/` as a **directory junction** pointing at the system path. VS Code's Copilot Chat sees prompts in the expected workspace location; the OS transparently routes all reads/writes to the locked system path.
+- `C:\ProgramData\speckit\prompts\` and `C:\ProgramData\speckit\agents\` hold the canonical Spec Kit prompt files and agent definitions. **Users have Read+Execute only**; SYSTEM/Admins have Full Control.
+- Every new repo created with `specify init` has both `.github/prompts/` and `.github/agents/` as **directory junctions** pointing at the system paths. VS Code's Copilot Chat sees them in the expected workspace location; the OS transparently routes all reads/writes to the locked system path.
+- Why two folders: Spec Kit splits each slash command across two files. `speckit.plan.prompt.md` is a thin stub that surfaces `/speckit.plan` in Copilot; it references `agent: speckit.plan` which resolves to `speckit.plan.agent.md` — the file that defines the actual behavior. Locking only prompts would let a user change agent behavior, which is what the slash command really runs.
 - Updates flow through one channel: a SYSTEM scheduled task pulls a central `speckit-prompts` repo every 4 hours into the system path. All workspaces see new prompts immediately — no `git pull` in user repos.
 - The corporate org's GitHub push ruleset (Layer 1, see `..\ruleset-org.json`) blocks any attempt to commit `.github/prompts/speckit.*.prompt.md` from a user who reinstalls upstream Spec Kit.
 
@@ -31,7 +32,16 @@ This package replaces per-repo prompt-file ACLs with a single system-managed pro
    Rename-Item -Path $real -NewName 'specify-upstream.exe'
    ```
 
-2. **A central GitHub repo** holding the canonical prompts, e.g. `<ORG>/speckit-prompts`, owned by `@<ORG>/speckit-admins`.
+2. **A central GitHub repo** holding both prompts and agents, e.g. `<ORG>/speckit-prompts`, owned by `@<ORG>/speckit-admins`. Expected layout:
+   ```
+   speckit-prompts/
+   ├── prompts/
+   │   ├── speckit.plan.prompt.md
+   │   └── ... (14 total)
+   └── agents/
+       ├── speckit.plan.agent.md
+       └── ... (14 total)
+   ```
 
 3. **Registry value or env var** pointing at it:
    - `HKLM\Software\YourOrg\SpecKit\PromptsRepo = https://github.com/<ORG>/speckit-prompts.git`
