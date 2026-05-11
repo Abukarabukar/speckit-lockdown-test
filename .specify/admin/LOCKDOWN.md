@@ -1,20 +1,59 @@
 # Spec Kit lockdown — admin runbook
 
-This repo's Spec Kit files are locked. End users **cannot** modify:
+End users **cannot** modify Spec Kit prompts, templates, or related configuration anywhere — not on GitHub, not on their own machines. Copilot reads everything normally; nothing about the slash commands changes.
 
-- `.github/prompts/speckit.*.prompt.md` — Copilot slash-command prompts
-- `.specify/**` — templates, scripts, workflows, integrations, memory
-- `.vscode/**` — editor configuration shipped by Spec Kit
-- `.github/CODEOWNERS` — the lock itself
-- `.github/workflows/lock-speckit.yml` — the CI guard
+## Recommended architecture (Option B + GitHub ruleset)
 
-Enforcement uses three layers:
+> **Use Option B as the primary local-enforcement model.** See [`option-b/README.md`](option-b/README.md) for the full deliverable.
 
-1. **GitHub push ruleset** with `file_path_restriction` (server-side, hard block on `git push`).
-2. **CODEOWNERS** + "Require review from Code Owners" branch protection (PR merge gate).
-3. **CI guard workflow** that verifies an admin approved any PR touching locked paths.
+```
+┌──────────────────────────────────────────────────────────────────┐
+│  Layer 1 — GitHub server                                          │
+│  Org push ruleset (ruleset-org.json) on every Spec Kit repo       │
+│  + CODEOWNERS + lock-speckit.yml CI guard                         │
+│  Blocks: any commit to .github/prompts/, .specify/, .vscode/      │
+└──────────────────────────────────────────────────────────────────┘
+                                ↑
+                                │ (server rejects push with GH013)
+                                │
+┌──────────────────────────────────────────────────────────────────┐
+│  Layer 2 — Every corp device (Intune)                             │
+│  C:\ProgramData\speckit\prompts\  ← SYSTEM:F  Admins:F  Users:RX  │
+│  Internal.SpecKit PowerShell wrapper shadows `specify init`:      │
+│    - removes workspace .github/prompts/                           │
+│    - sets chat.promptFilesLocations to the system path            │
+│    - adds .github/prompts/ to .gitignore                          │
+│  SpecKitPromptsSync scheduled task (SYSTEM, every 4h):            │
+│    - git pulls central <ORG>/speckit-prompts repo                 │
+│    - users keep RX, SYSTEM keeps F — no credential dance          │
+└──────────────────────────────────────────────────────────────────┘
+```
 
-Copilot still reads the prompt files normally — none of these layers restrict reads.
+### What this prevents end-to-end
+
+| Vector | Layer that catches it |
+|---|---|
+| User edits `C:\ProgramData\speckit\prompts\*.prompt.md` | Layer 2 NTFS ACL → `Access denied` |
+| User edits workspace `.github/prompts/*` | The folder doesn't exist after `specify init` (wrapper deletes it) |
+| User runs upstream `specify init` to recreate workspace prompts | Wrapper shadows `specify`; AppLocker can hard-block upstream binary |
+| User commits a hand-crafted workspace prompts dir | Layer 1 org push ruleset rejects the push |
+| User edits `.specify/templates/*` | Layer 1 covers it; per-repo `.specify/` ACL can be layered if needed |
+
+### Why Option B is preferred over the per-repo ACL approach
+
+| | Per-repo ACL (`intune/`) | Option B (`option-b/`) |
+|---|---|---|
+| State to lock | Every clone, every machine | One folder, every machine |
+| Discovery cycle | Intune scans for `.specify\extensions.yml` every 4h | None — wrapper acts at `specify init` time |
+| Prompt updates | Per-repo `git pull` as SYSTEM | One central repo, one SYSTEM puller |
+| User confusion | Sees `.github/prompts/` but can't edit them | No `.github/prompts/` at all |
+| Failure mode if Intune is slow | New repo unlocked until next remediation | New repo wrapper-processed immediately |
+
+The per-repo package (`.specify/admin/intune/`) is retained for backwards compatibility / hybrid rollouts, but new deployments should use Option B.
+
+## GitHub server-side enforcement (Layer 1 — required regardless of model)
+
+Identical for both models. Apply once at the org level.
 
 ---
 
