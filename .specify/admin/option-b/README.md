@@ -3,7 +3,7 @@
 This package replaces per-repo prompt-file ACLs with a single system-managed prompt path plus a corporate wrapper around `specify`. End-state on every device:
 
 - `C:\ProgramData\speckit\prompts\` holds the canonical Spec Kit prompts. **Users have Read+Execute only**; SYSTEM/Admins have Full Control.
-- Every new repo created with `specify init` has **no `.github/prompts/` folder**. Its `.vscode/settings.json` points VS Code at the system path.
+- Every new repo created with `specify init` has `.github/prompts/` as a **directory junction** pointing at the system path. VS Code's Copilot Chat sees prompts in the expected workspace location; the OS transparently routes all reads/writes to the locked system path.
 - Updates flow through one channel: a SYSTEM scheduled task pulls a central `speckit-prompts` repo every 4 hours into the system path. All workspaces see new prompts immediately — no `git pull` in user repos.
 - The corporate org's GitHub push ruleset (Layer 1, see `..\ruleset-org.json`) blocks any attempt to commit `.github/prompts/speckit.*.prompt.md` from a user who reinstalls upstream Spec Kit.
 
@@ -68,12 +68,11 @@ PS> cd C:\Users\dev\source\my-feature
 PS> specify init . --integration copilot
 # upstream specify runs (creates .specify, .github/prompts, .vscode)
 # Internal.SpecKit post-processes:
-#   removed workspace prompts at .github\prompts
-#   wrote chat.promptFilesLocations to .vscode\settings.json
+#   linked .github\prompts -> C:\ProgramData\speckit\prompts
 #   appended .github/prompts/ to .gitignore
 
 PS> ls .github
-# (no prompts/ folder)
+# prompts (junction → C:\ProgramData\speckit\prompts)
 
 PS> code .
 # In Copilot Chat:

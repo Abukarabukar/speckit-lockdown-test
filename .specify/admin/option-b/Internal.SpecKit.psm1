@@ -50,26 +50,24 @@ function Set-WorkspacePromptPolicy {
     return
   }
 
-  $workspacePrompts = Join-Path $TargetDir '.github\prompts'
-  if (Test-Path $workspacePrompts) {
-    Remove-Item -Recurse -Force $workspacePrompts
-    Write-Host "Internal.SpecKit: removed workspace prompts at $workspacePrompts"
-  }
+  # 1. Replace the workspace .github/prompts/ with a junction to the system path.
+  # VS Code's Copilot Chat resolves prompt files from .github/prompts/ in the
+  # workspace. Using a junction means the folder appears in the workspace as
+  # expected, but every read/write goes through the system path's ACL — so
+  # tampering is blocked at the OS layer with no Copilot-version dependency.
+  $githubDir        = Join-Path $TargetDir '.github'
+  $workspacePrompts = Join-Path $githubDir 'prompts'
+  New-Item -ItemType Directory -Force -Path $githubDir | Out-Null
+  if (Test-Path $workspacePrompts) { Remove-Item -Recurse -Force $workspacePrompts }
+  New-Item -ItemType Junction -Path $workspacePrompts -Target $script:SystemPromptsPath | Out-Null
+  Write-Host "Internal.SpecKit: linked $workspacePrompts -> $($script:SystemPromptsPath)"
 
-  $vscodeDir    = Join-Path $TargetDir '.vscode'
-  $settingsPath = Join-Path $vscodeDir 'settings.json'
-  New-Item -ItemType Directory -Force -Path $vscodeDir | Out-Null
-
-  $settings = if (Test-Path $settingsPath) {
-    try { Get-Content -Raw -Path $settingsPath | ConvertFrom-Json -AsHashtable } catch { @{} }
-  } else { @{} }
-
-  $settings['chat.promptFilesLocations'] = @($script:SystemPromptsPath)
-  $settings | ConvertTo-Json -Depth 20 | Set-Content -Path $settingsPath -Encoding UTF8
-  Write-Host "Internal.SpecKit: wrote chat.promptFilesLocations to $settingsPath"
-
+  # 2. Belt-and-suspenders: refuse to commit anything under .github/prompts/.
+  # The junction itself shouldn't be tracked by git (Add-Content/Remove-Item etc.
+  # against the junction target hit the system-path ACL anyway), but explicitly
+  # excluding it stops a confused user from committing a junction reference.
   $gitignore = Join-Path $TargetDir '.gitignore'
-  $marker    = '# Spec Kit prompts are managed by IT (see .vscode/settings.json)'
+  $marker    = '# Spec Kit prompts are managed by IT (junction to C:\ProgramData\speckit\prompts)'
   $line      = '.github/prompts/'
   $hasLine = (Test-Path $gitignore) -and ((Get-Content $gitignore -ErrorAction SilentlyContinue) -contains $line)
   if (-not $hasLine) {
