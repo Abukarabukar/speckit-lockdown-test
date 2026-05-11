@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>To-Do</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main class="container">
+      <h1>To-Do</h1>
+
+      <section id="auth-view">
+        <div class="card">
+          <h2 id="auth-title">Sign in</h2>
+          <form id="auth-form">
+            <label>
+              Username
+              <input id="username" type="text" autocomplete="username" required />
+            </label>
+            <label>
+              Password
+              <input id="password" type="password" autocomplete="current-password" required />
+            </label>
+            <button type="submit" id="auth-submit">Sign in</button>
+          </form>
+          <p class="muted">
+            <span id="auth-toggle-text">No account?</span>
+            <a href="#" id="auth-toggle">Create one</a>
+          </p>
+          <p id="auth-error" class="error" hidden></p>
+        </div>
+      </section>
+
+      <section id="app-view" hidden>
+        <div class="card">
+          <div class="row">
+            <p>Signed in as <strong id="me"></strong></p>
+            <button id="logout" class="link">Sign out</button>
+          </div>
+          <form id="todo-form" class="row">
+            <input id="todo-text" type="text" placeholder="What needs doing?" required />
+            <button type="submit">Add</button>
+          </form>
+          <ul id="todos"></ul>
+          <p id="todo-error" class="error" hidden></p>
+        </div>
+      </section>
+    </main>
+    <script src="./app.js"></script>
+  </body>
+</html>

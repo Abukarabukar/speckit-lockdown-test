@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm --version)",
+      "Bash(npm install *)",
+      "Bash(npm start *)",
+      "Bash(curl -s http://localhost:3001/api/todos -o nul -w \"backend:%{http_code}\\\\n\")",
+      "Bash(curl -s http://localhost:5173 -o nul -w \"frontend:%{http_code}\\\\n\")",
+      "Bash(where uv *)",
+      "Bash(where pipx *)",
+      "Bash(where uvx *)",
+      "Bash(py --version)",
+      "Bash(uv tool *)",
+      "Bash(specify version *)",
+      "PowerShell(specify version *)",
+      "PowerShell(specify init *)"
+    ]
+  }
+}
